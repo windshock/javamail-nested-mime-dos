@@ -71,7 +71,8 @@ the nesting-depth DoS:
 |---|---|
 | `javax.mail:mail` 1.4.4 (2011, EOL) | **StackOverflowError** @depth ~4900 |
 | `com.sun.mail:javax.mail` 1.6.2 (2018) | **StackOverflowError** @depth ~4900 |
-| `org.eclipse.angus:angus-mail` 2.0.3 (current) | **StackOverflowError** @depth ~4900 (surfaced as `IllegalStateException` whose cause is `StackOverflowError`, via the lazy `StreamProvider` ServiceLoader lookup) |
+| `org.eclipse.angus:angus-mail` 2.0.3 | **StackOverflowError** @depth ~4900 (surfaced as `IllegalStateException` whose cause is `StackOverflowError`, via the lazy `StreamProvider` ServiceLoader lookup) |
+| `org.eclipse.angus:angus-mail` **2.0.5** (latest stable) + `jakarta.mail-api` 2.1.3 | **StackOverflowError** (still) |
 
 The CPU/parse-time primitive *was* improved after 1.4.x (e.g. an 8000-deep message:
 ~521 s on 1.4.4 vs ~12 s on 1.6.2/Angus), but the **recursion/stack-exhaustion was
@@ -119,6 +120,11 @@ Exception in thread "main" java.lang.StackOverflowError
 | `src/MailIngestDos.java` | ingestion driver (POP3 fetch + MIME walk) |
 | `run.sh` | end-to-end local runner (POP3 ingestion, 1.4.4) |
 | `matrix.sh` | run the bomb across 1.4.4 / 1.6.2 / angus-mail 2.0.3 |
+
+## Disclosure
+
+- **2026-11-11** — Reported to the **Eclipse Foundation security team** (`security@eclipse.org`), covering the current maintained release (`org.eclipse.angus:angus-mail` 2.0.5 / `jakarta.mail-api` 2.1.3). Suggested fix: a configurable maximum multipart nesting depth (e.g. `mail.mime.multipart.maxdepth`).
+- This is a DoS-class issue (CWE-674) and a **known pattern** — see Apache James [`linagora/james-project#5675`](https://github.com/linagora/james-project/issues/5675) and analogous CVEs (CVE-2024-4140 Perl Email::MIME, CVE-2023-36632 Python). No novelty is claimed; this repo is a clean, reproducible demonstration.
 
 ## Remediation
 
