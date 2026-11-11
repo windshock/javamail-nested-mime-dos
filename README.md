@@ -1,5 +1,8 @@
 # JavaMail Nested-MIME Denial of Service (javax.mail:mail 1.4.x)
 
+[![PoC](https://github.com/windshock/javamail-nested-mime-dos/actions/workflows/poc.yml/badge.svg)](https://github.com/windshock/javamail-nested-mime-dos/actions/workflows/poc.yml)
+
+
 A single, small, **unauthenticated** email can take down any service that
 fetches and parses untrusted mail with an old JavaMail
 (`javax.mail:mail` 1.4.x) on the classpath.
@@ -51,6 +54,12 @@ Stack exhaustion (emulating a server worker-thread stack):
 |---|---|
 | `-Xss256k` | StackOverflowError ~depth 788 (≈55 KB email) |
 | `-Xss512k` | StackOverflowError ~depth 2,000–6,000 (≈0.4 MB email) |
+
+## One-click proof
+
+You don't need a local setup: the [**PoC** GitHub Actions workflow](../../actions/workflows/poc.yml) runs the whole attack on GitHub's runners and **passes only if the crash is reproduced** (StackOverflowError + non-zero JVM exit). Open the Actions tab, or click **Run workflow**, and read the log.
+
+Locally it is a single command:
 
 ## Run it (fully local — no external hosts contacted except Maven Central)
 

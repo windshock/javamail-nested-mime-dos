@@ -1,0 +1,39 @@
+name: PoC
+
+# One-click proof: runs the DoS end-to-end on GitHub's runners.
+# The job PASSES only if the crash (StackOverflowError + non-zero JVM exit)
+# is actually reproduced.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  reproduce-dos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Run PoC (nesting=6000, stack=256k) and assert the crash
+        run: |
+          set -o pipefail
+          ./run.sh 6000 256k 2>&1 | tee poc.out || true
+          echo "----- assertion -----"
+          if grep -q "java.lang.StackOverflowError" poc.out \
+             && grep -q "JVM exit code = 1" poc.out; then
+            echo "PASS: unauthenticated nested-MIME email crashed the ingestion thread"
+          else
+            echo "FAIL: crash not reproduced"
+            exit 1
+          fi
