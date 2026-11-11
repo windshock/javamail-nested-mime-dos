@@ -32,10 +32,10 @@ Resource Consumption), **CWE-1104** (Use of Unmaintained Third-Party Components)
 
 | | |
 |---|---|
-| Affected | `javax.mail:mail` 1.4.x (EOL) parsing **externally received** mail |
-| Fixed upstream | Later JavaMail (1.6+) / **Jakarta Mail** / **Eclipse Angus Mail** add count/size guards (`mail.mime.multipart.maxcount`, etc.) |
-| Attack surface | Any code doing `new MimeMessage(stream)` + `getContent()` walk on attacker-controlled mail (POP3/IMAP/stored `.eml`) |
-| Not relevant | Sending-only code (`Transport.send`) that *builds* messages from trusted data |
+| Affected | **All releases tested, including the current maintained one** — see the version matrix below. The stack-exhaustion primitive has **no nesting-depth guard** in any version. |
+| Partially mitigated | 1.6+ / Jakarta / Angus greatly reduced the *CPU* (super-linear parse-time) primitive and `mail.mime.multipart.maxcount` caps parts-per-multipart (breadth) — **but not nesting depth**. |
+| Attack surface | Any code doing `new MimeMessage(stream)` + `getContent()` walk on attacker-controlled mail (POP3/IMAP/stored `.eml`). |
+| Not relevant | Sending-only code (`Transport.send`) that *builds* messages from trusted data. |
 
 ## Measured behavior (local, JavaMail 1.4.4, JDK 17)
 
@@ -60,6 +60,30 @@ Stack exhaustion (emulating a server worker-thread stack):
 You don't need a local setup: the [**PoC** GitHub Actions workflow](../../actions/workflows/poc.yml) runs the whole attack on GitHub's runners and **passes only if the crash is reproduced** (StackOverflowError + non-zero JVM exit). Open the Actions tab, or click **Run workflow**, and read the log.
 
 Locally it is a single command:
+
+## Version matrix — current releases are still affected
+
+Same bomb, three releases, parsing on a fixed **1 MB thread stack** (so the crash
+depth is stable across hosts). `StackOverflowError` on a row = still vulnerable to
+the nesting-depth DoS:
+
+| release | outcome (nesting=6000) |
+|---|---|
+| `javax.mail:mail` 1.4.4 (2011, EOL) | **StackOverflowError** @depth ~4900 |
+| `com.sun.mail:javax.mail` 1.6.2 (2018) | **StackOverflowError** @depth ~4900 |
+| `org.eclipse.angus:angus-mail` 2.0.3 (current) | **StackOverflowError** @depth ~4900 |
+
+The CPU/parse-time primitive *was* improved after 1.4.x (e.g. an 8000-deep message:
+~521 s on 1.4.4 vs ~12 s on 1.6.2/Angus), but the **recursion/stack-exhaustion was
+not fixed** — there is no depth limit, and `maxcount` only bounds breadth. Reproduce:
+
+```bash
+./matrix.sh            # downloads 1.4.4 / 1.6.2 / angus-mail 2.0.3 and runs all three
+```
+
+> On real server worker threads (typically 256 KB–1 MB stack, far smaller than the
+> main thread) the crash triggers at only a few hundred to ~2000 levels — i.e. a
+> ~50–150 KB email.
 
 ## Run it (fully local — no external hosts contacted except Maven Central)
 
@@ -93,16 +117,18 @@ Exception in thread "main" java.lang.StackOverflowError
 | `src/gen_bomb.py` | generate the nested-multipart `.eml` |
 | `src/pop3d.py` | minimal local POP3 server serving one message |
 | `src/MailIngestDos.java` | ingestion driver (POP3 fetch + MIME walk) |
-| `run.sh` | end-to-end local runner |
+| `run.sh` | end-to-end local runner (POP3 ingestion, 1.4.4) |
+| `matrix.sh` | run the bomb across 1.4.4 / 1.6.2 / angus-mail 2.0.3 |
 
 ## Remediation
 
-- **Upgrade** off `javax.mail:mail` 1.4.x to **Jakarta Mail / Eclipse Angus Mail**.
+- **Upgrade is necessary but NOT sufficient** for the stack-exhaustion primitive — the current Angus Mail 2.0.3 is still affected (see matrix). Upgrading still fixes the severe CPU primitive and other bugs.
 - **Bound the parser**: set `mail.mime.multipart.maxcount` (and related limits)
   where supported.
-- **Bound your own walk**: cap recursion depth and total part count in the
-  ingestion loop; catch `Throwable` (not just `Exception`) around per-message
-  processing so one message cannot kill the worker thread.
+- **Bound your own walk (primary fix)**: cap recursion depth and total part count
+  in the ingestion loop; catch `Throwable` (not just `Exception`) around per-message
+  processing so one message cannot kill the worker thread. This is the part that
+  actually stops the stack-exhaustion DoS.
 - **Resource limits**: size caps on fetched messages, timeouts, isolate mail
   ingestion from other workloads.
 
