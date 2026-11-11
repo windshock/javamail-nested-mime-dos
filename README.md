@@ -71,7 +71,7 @@ the nesting-depth DoS:
 |---|---|
 | `javax.mail:mail` 1.4.4 (2011, EOL) | **StackOverflowError** @depth ~4900 |
 | `com.sun.mail:javax.mail` 1.6.2 (2018) | **StackOverflowError** @depth ~4900 |
-| `org.eclipse.angus:angus-mail` 2.0.3 (current) | **StackOverflowError** @depth ~4900 |
+| `org.eclipse.angus:angus-mail` 2.0.3 (current) | **StackOverflowError** @depth ~4900 (surfaced as `IllegalStateException` whose cause is `StackOverflowError`, via the lazy `StreamProvider` ServiceLoader lookup) |
 
 The CPU/parse-time primitive *was* improved after 1.4.x (e.g. an 8000-deep message:
 ~521 s on 1.4.4 vs ~12 s on 1.6.2/Angus), but the **recursion/stack-exhaustion was

@@ -18,7 +18,9 @@ public class MatrixDos_jakarta {
     Runnable r=()->{ long t0=System.currentTimeMillis();
       try{ MimeMessage m=new MimeMessage(S,new ByteArrayInputStream(raw)); walk(m,0); outcome="PARSED_OK"; }
       catch(StackOverflowError e){ outcome="StackOverflowError"; }
-      catch(Throwable t){ outcome=t.getClass().getSimpleName(); }
+      catch(Throwable t){ boolean soe=false;
+        for(Throwable c=t;c!=null;c=c.getCause()){ if(c instanceof StackOverflowError){soe=true;break;} }
+        outcome = soe ? ("StackOverflowError(via "+t.getClass().getSimpleName()+")") : t.getClass().getSimpleName(); }
       ms=System.currentTimeMillis()-t0; };
     Thread th=new Thread(null,r,"w",stack); th.start(); th.join();
     System.out.println(label+"\tnesting="+n+"\tstack="+(stack/1024)+"KB\t"+outcome+"\tdepth="+maxDepth+"\t"+ms+"ms");
